@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createAppBridge } from "@0xchat/app-sdk";
+import { BevoMiniApp } from "@bevo/app-sdk";
 import { USDC_BASE_SEPOLIA } from "@/lib/bridge";
 
 interface Step {
@@ -12,10 +12,10 @@ interface Step {
 
 export function DebugPage() {
   const [steps, setSteps] = useState<Step[]>([
-    { label: "window.parent !== window (iframe detection)", status: "pending" },
-    { label: "createAppBridge()", status: "pending" },
-    { label: "user.getProfile()", status: "pending" },
-    { label: "wallet.getBalance({ token: 'USDC' })", status: "pending" },
+    { label: "BevoMiniApp.isInsideBevo", status: "pending" },
+    { label: "BevoMiniApp.init() / mock()", status: "pending" },
+    { label: "bevo.user (profile)", status: "pending" },
+    { label: "bevo.waitForBalances()", status: "pending" },
   ]);
 
   const patch = (index: number, update: Partial<Step>) =>
@@ -23,26 +23,29 @@ export function DebugPage() {
 
   useEffect(() => {
     (async () => {
-      // Step 0: iframe detection
-      const inIframe = typeof window !== "undefined" && window.parent !== window;
-      patch(0, { status: "ok", value: String(inIframe) });
+      // Step 0: isInsideBevo detection
+      const isInside = BevoMiniApp.isInsideBevo;
+      patch(0, { status: "ok", value: String(isInside) });
 
-      // Step 1: bridge init
-      let sdk: ReturnType<typeof createAppBridge> | null = null;
+      // Step 1: init or mock
+      let bevo: BevoMiniApp | null = null;
       const t1 = Date.now();
       try {
-        sdk = createAppBridge({ appId: "splitpay", timeout: 5000 });
-        patch(1, { status: "ok", value: "bridge created", ms: Date.now() - t1 });
+        bevo = isInside ? BevoMiniApp.init() : BevoMiniApp.mock();
+        patch(1, {
+          status: "ok",
+          value: isInside ? "init() — inside Bevo" : "mock() — dev mode",
+          ms: Date.now() - t1,
+        });
       } catch (e: any) {
         patch(1, { status: "error", error: e?.message ?? String(e), ms: Date.now() - t1 });
         return;
       }
 
-      // Step 2: getProfile
+      // Step 2: user profile (synchronous)
       const t2 = Date.now();
-      let profile: any = null;
       try {
-        profile = await sdk.user.getProfile();
+        const profile = bevo.user;
         patch(2, {
           status: "ok",
           value: JSON.stringify(profile, null, 2),
@@ -52,17 +55,17 @@ export function DebugPage() {
         patch(2, { status: "error", error: e?.message ?? String(e), ms: Date.now() - t2 });
       }
 
-      // Step 3: getBalance (only if profile succeeded)
-      if (profile) {
-        const t3 = Date.now();
-        try {
-          const balance = await sdk.wallet.getBalance({ token: "USDC" });
-          patch(3, { status: "ok", value: `${balance} USDC`, ms: Date.now() - t3 });
-        } catch (e: any) {
-          patch(3, { status: "error", error: e?.message ?? String(e), ms: Date.now() - t3 });
-        }
-      } else {
-        patch(3, { status: "error", error: "skipped — getProfile failed" });
+      // Step 3: wait for balances
+      const t3 = Date.now();
+      try {
+        const balances = await bevo.waitForBalances(5000);
+        patch(3, {
+          status: "ok",
+          value: `USDC: ${balances.usdc ?? "null"} · ETH: ${balances.eth ?? "null"} · USDT: ${balances.usdt ?? "null"}`,
+          ms: Date.now() - t3,
+        });
+      } catch (e: any) {
+        patch(3, { status: "error", error: e?.message ?? String(e), ms: Date.now() - t3 });
       }
     })();
   }, []);
@@ -71,7 +74,7 @@ export function DebugPage() {
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-3">
       <h1 className="text-base font-bold">Bridge Debug</h1>
       <p className="text-xs text-text-muted">
-        appId: <code className="font-mono">splitpay</code> · timeout: 5000ms · chain: Base Sepolia (84532)
+        SDK: <code className="font-mono">@bevo/app-sdk</code> · BevoMiniApp
       </p>
       <p className="text-xs text-text-dim font-mono break-all">
         USDC: {USDC_BASE_SEPOLIA}

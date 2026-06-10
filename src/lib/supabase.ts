@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { GroupMember } from "@0xchat/app-sdk";
+import type { GroupMember } from "./bridge";
 import { normalizeWallet } from "./utils";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string;

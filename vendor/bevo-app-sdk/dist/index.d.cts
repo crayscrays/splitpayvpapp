@@ -1,294 +1,140 @@
-interface GroupMember {
+interface BevoContext {
+    authToken: string;
+    apiBase: string;
+    principalId: string;
     walletAddress: string;
     displayName: string;
+    username: string;
     avatar: string;
-    roles: string[];
-}
-interface AppBridgeConfig {
-    appId: string;
-}
-interface BridgeMessage {
-    type: "bevo-bridge";
-    id: string;
-    method: string;
-    params?: any;
-    appId: string;
-}
-interface BridgeResponse {
-    type: "bevo-bridge-response";
-    id: string;
-    result?: any;
-    error?: {
-        code: number;
-        message: string;
+    balances: {
+        eth: number | null;
+        usdc: number | null;
+        usdt: number | null;
     };
-}
-declare class BridgeError extends Error {
-    code: number;
-    constructor(message: string, code: number);
+    agentWalletAddress: string | null;
+    agentPrincipalId: string | null;
 }
 interface UserProfile {
+    principalId: string;
     walletAddress: string;
     displayName: string;
+    username: string;
     avatar: string;
 }
-interface Contact {
+interface WalletBalances {
+    eth: number | null;
+    usdc: number | null;
+    usdt: number | null;
+}
+interface AgentInfo {
     walletAddress: string;
-    displayName: string;
-    avatar: string;
+    principalId: string;
 }
-interface GroupSummary {
+interface BevoConversation {
     id: string;
+    peerPrincipalId: string;
+    peerDisplayName: string;
+    peerUsername: string;
+    peerAvatar: string;
+    lastMessage: string;
+    lastMessageTime: string;
+    unreadCount: number;
+}
+interface BevoMessage {
+    id: number | string;
+    senderId: string;
+    content: string;
+    createdAt: string;
+}
+interface BevoGroup {
+    id: number;
     name: string;
+    handle: string;
     avatar: string;
     memberCount: number;
+    description: string;
 }
-interface SendTransactionParams {
-    to: string;
-    token: string;
-    amount: string;
-}
-interface SignMessageParams {
-    message: string;
-}
-type CardActionKind = "callback" | "wallet_action" | "link" | "open_app";
-type CardActionStyle = "primary" | "secondary" | "danger";
-interface CardField {
-    label: string;
-    value: string;
-}
-interface CardAction {
-    /** Unique identifier — returned in the card_action webhook event */
+interface BevoApp {
     id: string;
-    label: string;
-    kind: CardActionKind;
-    style?: CardActionStyle;
-    /** For "callback": opaque payload forwarded to your webhook */
-    payload?: Record<string, unknown>;
-    /** For "wallet_action": transaction to sign */
-    tx?: {
-        to: string;
-        /** ERC-20 token contract address; omit for native ETH */
-        token?: string;
-        amount: string;
-        decimals?: number;
-    };
-    /** For "link" */
-    url?: string;
-    /** For "open_app" */
-    appSlug?: string;
-}
-interface AppCard {
-    type: "app_card";
-    title: string;
-    subtitle?: string;
-    imageUrl?: string;
-    fields?: CardField[];
-    actions?: CardAction[];
-    /**
-     * Optional metadata attached to the card.
-     * - `targetWallet`: only this wallet address can interact with the card's actions.
-     *   Other members see the card but buttons are disabled.
-     * - `completedActions`: set by the server after an action is executed;
-     *   read-only from the app's perspective.
-     */
-    metadata?: {
-        targetWallet?: string;
-        completedActions?: Record<string, {
-            txHash?: string;
-            at?: string;
-        }>;
-        [key: string]: unknown;
-    };
-}
-/**
- * Sends a tappable "Requesting X ETH · Tap to pay" bubble into a group channel.
- * Rendered identically to the DM payment request UI.
- * When the user pays, your webhook receives a `card_action` event with
- * `actionId: "pay"` and `result: { txHash }`.
- */
-interface PaymentRequestCard {
-    type: "payment_request";
-    amount: string;
-    symbol: string;
-    /** ERC-20 token contract address; omit for native ETH */
-    tokenAddress?: string;
-    decimals?: number;
-    /** Address that receives the payment */
-    requesterAddress: string;
-    /**
-     * If set, only this wallet can tap to pay.
-     * Other members see "Not for you" and cannot interact.
-     */
-    targetWallet?: string;
-}
-interface AppCardField {
-    label: string;
-    value: string;
-}
-interface ShareCardParams {
-    to: string;
-    card: AppCard;
-}
-interface ShareCardToGroupParams {
-    groupId: string;
-    channelId: string;
-    card: AppCard | PaymentRequestCard;
-}
-interface AddBotParams {
-    botHandle: string;
-    groupId: string;
-}
-interface BotDeployment {
-    type: "group" | "dm";
-    id: string;
+    slug: string;
     name: string;
-    addedAt: string;
+    description: string;
+    category: string;
+    installCount: number;
+    isVerified: boolean;
+    iconUrl: string | null;
+    miniappEnabled: boolean;
+    entryUrl: string | null;
+    permissions: string[];
 }
-interface ReadContractParams {
-    address: string;
-    abi: any[];
-    functionName: string;
-    args?: any[];
-}
-
-declare class AppBridge {
-    private pending;
-    private appId;
-    private timeout;
-    private boundHandler;
-    constructor(config: AppBridgeConfig & {
-        timeout?: number;
-    });
-    private handleMessage;
-    private request;
-    destroy(): void;
-    wallet: {
-        getAddress: () => Promise<string>;
-        getChainId: () => Promise<number>;
-        getBalance: (params: {
-            token?: string;
-        }) => Promise<string>;
-        sendTransaction: (params: SendTransactionParams) => Promise<string>;
-        signMessage: (params: SignMessageParams) => Promise<string>;
-        readContract: (params: ReadContractParams) => Promise<any>;
-    };
-    user: {
-        getProfile: () => Promise<UserProfile>;
-    };
-    contacts: {
-        list: () => Promise<Contact[]>;
-    };
-    groups: {
-        list: () => Promise<GroupSummary[]>;
-        getMembers: (groupId: string) => Promise<GroupMember[]>;
-    };
-    chat: {
-        shareCard: (params: ShareCardParams) => Promise<void>;
-        shareCardToGroup: (params: ShareCardToGroupParams) => Promise<void>;
-    };
-    bots: {
-        addToGroup: (params: AddBotParams) => Promise<{
-            success: boolean;
-        }>;
-        removeFromGroup: (params: AddBotParams) => Promise<{
-            success: boolean;
-        }>;
-        addToDm: (params: {
-            botHandle: string;
-            peerAddress: string;
-        }) => Promise<{
-            success: boolean;
-        }>;
-        listDeployments: (botHandle: string) => Promise<BotDeployment[]>;
-    };
-    navigation: {
-        openGroup: (groupId: string) => void;
-        openDm: (peerAddress: string) => void;
-        openApp: (appSlug: string, params?: Record<string, string>) => void;
-    };
-}
-declare function createAppBridge(config: AppBridgeConfig & {
-    timeout?: number;
-}): AppBridge;
-type EIP1193Listener = (...args: any[]) => void;
-/**
- * EIP-1193 compliant Ethereum provider that routes all RPC calls through the
- * Bevo bridge. Plug into wagmi, ethers, viem, or any wallet library to
- * auto-connect with the user's embedded wallet when running inside Bevo.
- */
-declare class BridgeProvider {
-    private bridge;
-    private listeners;
-    constructor(bridge: AppBridge);
-    static isAvailable(): boolean;
-    request({ method, params }: {
-        method: string;
-        params?: unknown[];
-    }): Promise<unknown>;
-    on(event: string, listener: EIP1193Listener): this;
-    removeListener(event: string, listener: EIP1193Listener): this;
-    addEventListener(event: string, listener: EIP1193Listener): this;
-    removeEventListener(event: string, listener: EIP1193Listener): this;
+type BevoPermission = "wallet.read" | "wallet.send" | "wallet.sign" | "user.read" | "contacts.read" | "groups.read" | "chat.write" | "bots.manage";
+declare global {
+    interface Window {
+        BevoContext?: BevoContext;
+    }
+    interface WindowEventMap {
+        "bevo:context-updated": CustomEvent<BevoContext>;
+    }
 }
 
-interface MockBridgeConfig extends AppBridgeConfig {
-    walletAddress?: string;
-    profile?: Partial<UserProfile>;
-    contacts?: Contact[];
-    groups?: GroupSummary[];
-    onCall?: (method: string, params?: any) => void;
+declare class BevoApiClient {
+    private context;
+    constructor(context: BevoContext);
+    _update(context: BevoContext): void;
+    private get headers();
+    private get base();
+    request<T = unknown>(path: string, init?: RequestInit): Promise<T>;
+    getMyProfile(): Promise<UserProfile>;
+    updateProfile(data: Partial<Pick<UserProfile, "displayName" | "username">> & {
+        bio?: string;
+    }): Promise<void>;
+    searchUsers(query: string): Promise<UserProfile[]>;
+    getConversations(): Promise<BevoConversation[]>;
+    createOrGetConversation(peerPrincipalId: string): Promise<string>;
+    getMessages(conversationId: string, after?: string): Promise<BevoMessage[]>;
+    sendMessage(conversationId: string, content: string): Promise<{
+        message: BevoMessage;
+    }>;
+    markRead(conversationId: string): Promise<void>;
+    getMyGroups(): Promise<BevoGroup[]>;
+    searchGroups(query: string): Promise<BevoGroup[]>;
+    getApps(params?: {
+        search?: string;
+        category?: string;
+    }): Promise<BevoApp[]>;
+    getApp(slug: string): Promise<{
+        app: BevoApp;
+        installed: boolean;
+        grantedPermissions: string[];
+    }>;
+    transferTokens(params: {
+        toUserHandle?: string;
+        toUserWallet?: string;
+        amountEth: number;
+        token?: "ETH" | "USDC" | "USDT";
+        fromWallet?: "agent" | "personal";
+    }): Promise<{
+        txHash: string;
+        fromWallet: string;
+        toWallet: string;
+        amount: number;
+        token: string;
+    }>;
 }
-declare class MockAppBridge {
-    private cfg;
-    constructor(config: MockBridgeConfig);
-    private log;
-    destroy(): void;
-    wallet: {
-        getAddress: () => Promise<string>;
-        getChainId: () => Promise<number>;
-        getBalance: (params: {
-            token?: string;
-        }) => Promise<string>;
-        sendTransaction: (params: SendTransactionParams) => Promise<string>;
-        signMessage: (params: SignMessageParams) => Promise<string>;
-        readContract: (params: ReadContractParams) => Promise<null>;
-    };
-    user: {
-        getProfile: () => Promise<UserProfile>;
-    };
-    contacts: {
-        list: () => Promise<Contact[]>;
-    };
-    groups: {
-        list: () => Promise<GroupSummary[]>;
-        getMembers: (groupId: string) => Promise<GroupMember[]>;
-    };
-    chat: {
-        shareCard: (params: ShareCardParams) => Promise<void>;
-        shareCardToGroup: (params: ShareCardToGroupParams) => Promise<void>;
-    };
-    bots: {
-        addToGroup: (params: AddBotParams) => Promise<{
-            success: boolean;
-        }>;
-        removeFromGroup: (params: AddBotParams) => Promise<{
-            success: boolean;
-        }>;
-        addToDm: (params: {
-            botHandle: string;
-            peerAddress: string;
-        }) => Promise<{
-            success: boolean;
-        }>;
-        listDeployments: (botHandle: string) => Promise<BotDeployment[]>;
-    };
-    navigation: {
-        openGroup: (groupId: string) => void;
-        openDm: (peerAddress: string) => void;
-        openApp: (appSlug: string, params?: Record<string, string>) => void;
-    };
+declare class BevoMiniApp {
+    private _context;
+    readonly api: BevoApiClient;
+    private constructor();
+    static init(): BevoMiniApp;
+    static mock(overrides?: Partial<BevoContext>): BevoMiniApp;
+    get context(): BevoContext;
+    get user(): UserProfile;
+    get balances(): WalletBalances;
+    get agent(): AgentInfo | null;
+    static get isInsideBevo(): boolean;
+    onUpdate(callback: (context: BevoContext) => void): () => void;
+    waitForBalances(timeoutMs?: number): Promise<WalletBalances>;
+    waitForAgent(timeoutMs?: number): Promise<AgentInfo>;
 }
-declare function createMockBridge(config: MockBridgeConfig): MockAppBridge;
 
-export { type AddBotParams, AppBridge, type AppBridgeConfig, type AppCard, type AppCardField, type BotDeployment, BridgeError, type BridgeMessage, BridgeProvider, type BridgeResponse, type CardAction, type CardActionKind, type CardActionStyle, type CardField, type Contact, type GroupMember, type GroupSummary, MockAppBridge, type MockBridgeConfig, type PaymentRequestCard, type ReadContractParams, type SendTransactionParams, type ShareCardParams, type ShareCardToGroupParams, type SignMessageParams, type UserProfile, createAppBridge, createMockBridge };
+export { type AgentInfo, BevoApiClient, type BevoApp, type BevoContext, type BevoConversation, type BevoGroup, type BevoMessage, BevoMiniApp, type BevoPermission, type UserProfile, type WalletBalances };

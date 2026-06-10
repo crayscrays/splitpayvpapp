@@ -1,5 +1,5 @@
 import { ArrowRight } from "lucide-react";
-import type { GroupMember } from "@0xchat/app-sdk";
+import type { GroupMember } from "@/lib/bridge";
 import { MemberAvatar } from "./MemberAvatar";
 import { formatAddress, formatCurrency } from "@/lib/utils";
 

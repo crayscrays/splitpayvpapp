@@ -1,318 +1,217 @@
-// src/types.ts
-var BridgeError = class extends Error {
-  constructor(message, code) {
-    super(message);
-    this.name = "BridgeError";
-    this.code = code;
-  }
-};
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-// src/bridge.ts
-var AppBridge = class {
-  constructor(config) {
-    this.pending = /* @__PURE__ */ new Map();
-    this.wallet = {
-      getAddress: () => this.request("wallet.getAddress"),
-      getChainId: () => this.request("wallet.getChainId"),
-      getBalance: (params) => this.request("wallet.getBalance", params),
-      sendTransaction: (params) => this.request("wallet.sendTransaction", params),
-      signMessage: (params) => this.request("wallet.signMessage", params),
-      readContract: (params) => this.request("wallet.readContract", params)
-    };
-    this.user = {
-      getProfile: () => this.request("user.getProfile")
-    };
-    this.contacts = {
-      list: () => this.request("contacts.list")
-    };
-    this.groups = {
-      list: () => this.request("groups.list"),
-      getMembers: (groupId) => this.request("groups.getMembers", { groupId })
-    };
-    this.chat = {
-      shareCard: (params) => this.request("chat.shareCard", params),
-      shareCardToGroup: (params) => this.request("chat.shareCardToGroup", params)
-    };
-    this.bots = {
-      addToGroup: (params) => this.request("bots.addToGroup", params),
-      removeFromGroup: (params) => this.request("bots.removeFromGroup", params),
-      addToDm: (params) => this.request("bots.addToDm", params),
-      listDeployments: (botHandle) => this.request("bots.listDeployments", { botHandle })
-    };
-    this.navigation = {
-      openGroup: (groupId) => {
-        this.request("navigation.openGroup", { groupId }).catch(() => {
-        });
-      },
-      openDm: (peerAddress) => {
-        this.request("navigation.openDm", { peerAddress }).catch(() => {
-        });
-      },
-      openApp: (appSlug, params) => {
-        this.request("navigation.openApp", { appSlug, params }).catch(() => {
-        });
-      }
-    };
-    this.appId = config.appId;
-    this.timeout = config.timeout || 3e4;
-    this.boundHandler = this.handleMessage.bind(this);
-    window.addEventListener("message", this.boundHandler);
+// src/app.ts
+var BevoApiClient = class {
+  constructor(context) {
+    __publicField(this, "context");
+    this.context = context;
   }
-  handleMessage(event) {
-    const msg = event.data;
-    if (!msg || msg.type !== "bevo-bridge-response") return;
-    const handler = this.pending.get(msg.id);
-    if (!handler) return;
-    clearTimeout(handler.timeout);
-    this.pending.delete(msg.id);
-    if (msg.error) {
-      handler.reject(new BridgeError(msg.error.message, msg.error.code));
-    } else {
-      handler.resolve(msg.result);
+  _update(context) {
+    this.context = context;
+  }
+  get headers() {
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this.context.authToken}`
+    };
+  }
+  get base() {
+    return this.context.apiBase.replace(/\/+$/, "");
+  }
+  async request(path, init = {}) {
+    const res = await fetch(`${this.base}${path}`, {
+      ...init,
+      headers: { ...this.headers, ...init.headers }
+    });
+    if (!res.ok) {
+      const text2 = await res.text().catch(() => res.statusText);
+      throw new Error(`Bevo API ${init.method ?? "GET"} ${path} \u2192 ${res.status}: ${text2}`);
     }
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
   }
-  request(method, params) {
-    return new Promise((resolve, reject) => {
-      const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const timeout = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new BridgeError("Request timed out", 408));
-      }, this.timeout);
-      this.pending.set(id, { resolve, reject, timeout });
-      window.parent.postMessage(
-        { type: "bevo-bridge", id, method, params, appId: this.appId },
-        "*"
-      );
+  getMyProfile() {
+    return this.request("/api/users/me");
+  }
+  updateProfile(data) {
+    return this.request("/api/users/profile", {
+      method: "PATCH",
+      body: JSON.stringify(data)
     });
   }
-  destroy() {
-    window.removeEventListener("message", this.boundHandler);
-    for (const [, handler] of this.pending) {
-      clearTimeout(handler.timeout);
-      handler.reject(new BridgeError("Bridge destroyed", 499));
-    }
-    this.pending.clear();
+  searchUsers(query) {
+    return this.request(`/api/users/search?q=${encodeURIComponent(query)}`);
+  }
+  async getConversations() {
+    const data = await this.request(
+      "/api/chat/conversations"
+    );
+    return Array.isArray(data) ? data : data.items ?? [];
+  }
+  async createOrGetConversation(peerPrincipalId) {
+    const data = await this.request("/api/chat/conversations", {
+      method: "POST",
+      body: JSON.stringify({ peerPrincipalId })
+    });
+    return data.id;
+  }
+  async getMessages(conversationId, after) {
+    const params = after ? `?after=${encodeURIComponent(after)}` : "";
+    const data = await this.request(
+      `/api/chat/conversations/${conversationId}/messages${params}`
+    );
+    return Array.isArray(data) ? data : data.items ?? [];
+  }
+  sendMessage(conversationId, content) {
+    return this.request(`/api/chat/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content })
+    });
+  }
+  markRead(conversationId) {
+    return this.request(`/api/chat/conversations/${conversationId}/read`, {
+      method: "POST"
+    });
+  }
+  async getMyGroups() {
+    const principalId = this.context.principalId;
+    const data = await this.request(
+      `/api/groups/by-principal/${principalId}`
+    );
+    return Array.isArray(data) ? data : data.items ?? [];
+  }
+  async searchGroups(query) {
+    const data = await this.request(
+      `/api/groups/search?q=${encodeURIComponent(query)}`
+    );
+    return Array.isArray(data) ? data : data.items ?? [];
+  }
+  async getApps(params) {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.set("search", params.search);
+    if (params?.category) qs.set("category", params.category);
+    const data = await this.request(
+      `/api/apps${qs.size ? `?${qs}` : ""}`
+    );
+    return data.items;
+  }
+  getApp(slug) {
+    return this.request(`/api/apps/${slug}`);
+  }
+  transferTokens(params) {
+    return this.request("/api/wallet/transfer", {
+      method: "POST",
+      body: JSON.stringify({ chainId: 8453, ...params })
+    });
   }
 };
-function createAppBridge(config) {
-  return new AppBridge(config);
-}
-var BridgeProvider = class {
-  constructor(bridge) {
-    this.listeners = /* @__PURE__ */ new Map();
-    this.bridge = bridge;
+var BevoMiniApp = class _BevoMiniApp {
+  constructor(context) {
+    __publicField(this, "_context");
+    __publicField(this, "api");
+    this._context = context;
+    this.api = new BevoApiClient(context);
+    window.addEventListener("bevo:context-updated", (e) => {
+      this._context = e.detail;
+      this.api._update(e.detail);
+    });
   }
-  static isAvailable() {
-    try {
-      return window.parent !== window;
-    } catch {
-      return true;
+  static init() {
+    if (typeof window === "undefined" || !window.BevoContext) {
+      throw new Error(
+        "[bevo-app-sdk] window.BevoContext is not available. Make sure your mini-app is running inside the Bevo app WebView."
+      );
     }
+    return new _BevoMiniApp(window.BevoContext);
   }
-  async request({ method, params }) {
-    switch (method) {
-      case "eth_accounts":
-      case "eth_requestAccounts": {
-        const address = await this.bridge.wallet.getAddress();
-        return address ? [address] : [];
-      }
-      case "eth_chainId": {
-        const chainId = await this.bridge.wallet.getChainId();
-        return "0x" + chainId.toString(16);
-      }
-      case "net_version": {
-        const chainId = await this.bridge.wallet.getChainId();
-        return String(chainId);
-      }
-      case "personal_sign": {
-        const raw = params?.[0] ?? "";
-        return this.bridge.wallet.signMessage({ message: decodeHexMessage(raw) });
-      }
-      case "eth_sign": {
-        const raw = params?.[1] ?? "";
-        return this.bridge.wallet.signMessage({ message: decodeHexMessage(raw) });
-      }
-      case "eth_sendTransaction": {
-        const tx = params?.[0] ?? {};
-        if (!tx.to) throw providerError(4001, "Missing 'to' address in transaction");
-        if (tx.data && tx.data !== "0x")
-          throw providerError(
-            4200,
-            "Contract call transactions are not supported via the Bevo bridge"
-          );
-        const amount = formatWei(tx.value ? BigInt(tx.value) : 0n, 18);
-        return this.bridge.wallet.sendTransaction({ to: tx.to, token: "ETH", amount });
-      }
-      default:
-        throw providerError(4200, `Method not supported via Bevo bridge: ${method}`);
+  static mock(overrides = {}) {
+    const mock = {
+      authToken: "dev-token",
+      apiBase: "http://localhost:5000",
+      principalId: "dev-principal-id",
+      walletAddress: "0xdevwallet",
+      displayName: "Dev User",
+      username: "devuser",
+      avatar: "",
+      balances: { eth: 1, usdc: 100, usdt: 0 },
+      agentWalletAddress: "0xdevagentwallet",
+      agentPrincipalId: "dev-agent-principal-id",
+      ...overrides
+    };
+    if (typeof window !== "undefined") {
+      window.BevoContext = mock;
     }
+    return new _BevoMiniApp(mock);
   }
-  on(event, listener) {
-    if (!this.listeners.has(event)) this.listeners.set(event, /* @__PURE__ */ new Set());
-    this.listeners.get(event).add(listener);
-    return this;
+  get context() {
+    return this._context;
   }
-  removeListener(event, listener) {
-    this.listeners.get(event)?.delete(listener);
-    return this;
+  get user() {
+    return {
+      principalId: this._context.principalId,
+      walletAddress: this._context.walletAddress,
+      displayName: this._context.displayName,
+      username: this._context.username,
+      avatar: this._context.avatar
+    };
   }
-  addEventListener(event, listener) {
-    return this.on(event, listener);
+  get balances() {
+    return this._context.balances;
   }
-  removeEventListener(event, listener) {
-    return this.removeListener(event, listener);
+  get agent() {
+    if (!this._context.agentWalletAddress || !this._context.agentPrincipalId) return null;
+    return {
+      walletAddress: this._context.agentWalletAddress,
+      principalId: this._context.agentPrincipalId
+    };
+  }
+  static get isInsideBevo() {
+    return typeof window !== "undefined" && !!window.BevoContext;
+  }
+  onUpdate(callback) {
+    const handler = (e) => callback(e.detail);
+    window.addEventListener("bevo:context-updated", handler);
+    return () => window.removeEventListener("bevo:context-updated", handler);
+  }
+  waitForBalances(timeoutMs = 1e4) {
+    if (this._context.balances.eth !== null) {
+      return Promise.resolve(this._context.balances);
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Timed out waiting for wallet balances")),
+        timeoutMs
+      );
+      const unsub = this.onUpdate((ctx) => {
+        if (ctx.balances.eth !== null) {
+          clearTimeout(timer);
+          unsub();
+          resolve(ctx.balances);
+        }
+      });
+    });
+  }
+  waitForAgent(timeoutMs = 1e4) {
+    if (this.agent) return Promise.resolve(this.agent);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Timed out waiting for agent wallet")),
+        timeoutMs
+      );
+      const unsub = this.onUpdate((_ctx) => {
+        const a = this.agent;
+        if (a) {
+          clearTimeout(timer);
+          unsub();
+          resolve(a);
+        }
+      });
+    });
   }
 };
-function providerError(code, message) {
-  const err = new Error(message);
-  err.code = code;
-  return err;
-}
-function decodeHexMessage(raw) {
-  if (!raw.startsWith("0x")) return raw;
-  try {
-    const hex = raw.slice(2);
-    const bytes = new Uint8Array((hex.match(/.{1,2}/g) ?? []).map((b) => parseInt(b, 16)));
-    return new TextDecoder().decode(bytes);
-  } catch {
-    return raw;
-  }
-}
-function formatWei(wei, decimals) {
-  if (wei === 0n) return "0";
-  const divisor = BigInt(10 ** decimals);
-  const whole = wei / divisor;
-  const fraction = wei % divisor;
-  if (fraction === 0n) return whole.toString();
-  const fractionStr = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
-  return `${whole}.${fractionStr}`;
-}
-
-// src/mock.ts
-var MockAppBridge = class {
-  constructor(config) {
-    this.wallet = {
-      getAddress: async () => {
-        this.log("wallet.getAddress");
-        return this.cfg.walletAddress ?? "0xf00d000000000000000000000000000000000001";
-      },
-      getChainId: async () => {
-        this.log("wallet.getChainId");
-        return 8453;
-      },
-      getBalance: async (params) => {
-        this.log("wallet.getBalance", params);
-        return "100.00";
-      },
-      sendTransaction: async (params) => {
-        this.log("wallet.sendTransaction", params);
-        return "0xmocktxhash";
-      },
-      signMessage: async (params) => {
-        this.log("wallet.signMessage", params);
-        return "0xmocksignature";
-      },
-      readContract: async (params) => {
-        this.log("wallet.readContract", params);
-        return null;
-      }
-    };
-    this.user = {
-      getProfile: async () => {
-        this.log("user.getProfile");
-        return {
-          walletAddress: this.cfg.walletAddress ?? "0xf00d000000000000000000000000000000000001",
-          displayName: "dev.eth",
-          avatar: "",
-          ...this.cfg.profile
-        };
-      }
-    };
-    this.contacts = {
-      list: async () => {
-        this.log("contacts.list");
-        return this.cfg.contacts ?? [];
-      }
-    };
-    this.groups = {
-      list: async () => {
-        this.log("groups.list");
-        return this.cfg.groups ?? [{ id: "mock-group-1", name: "Dev Group", avatar: "", memberCount: 2 }];
-      },
-      getMembers: async (groupId) => {
-        this.log("groups.getMembers", { groupId });
-        return [
-          {
-            walletAddress: "0xf00d000000000000000000000000000000000001",
-            displayName: "dev.eth",
-            avatar: "",
-            roles: ["admin"]
-          },
-          {
-            walletAddress: "0xbeef000000000000000000000000000000000002",
-            displayName: "alice.eth",
-            avatar: "",
-            roles: ["member"]
-          }
-        ];
-      }
-    };
-    this.chat = {
-      shareCard: async (params) => {
-        this.log("chat.shareCard", params);
-      },
-      shareCardToGroup: async (params) => {
-        this.log("chat.shareCardToGroup", params);
-      }
-    };
-    this.bots = {
-      addToGroup: async (params) => {
-        this.log("bots.addToGroup", params);
-        return { success: true };
-      },
-      removeFromGroup: async (params) => {
-        this.log("bots.removeFromGroup", params);
-        return { success: true };
-      },
-      addToDm: async (params) => {
-        this.log("bots.addToDm", params);
-        return { success: true };
-      },
-      listDeployments: async (botHandle) => {
-        this.log("bots.listDeployments", { botHandle });
-        return [];
-      }
-    };
-    this.navigation = {
-      openGroup: (groupId) => {
-        this.log("navigation.openGroup", { groupId });
-      },
-      openDm: (peerAddress) => {
-        this.log("navigation.openDm", { peerAddress });
-      },
-      openApp: (appSlug, params) => {
-        this.log("navigation.openApp", { appSlug, params });
-      }
-    };
-    this.cfg = config;
-  }
-  log(method, params) {
-    console.log(`[MockAppBridge] ${method}`, params ?? "");
-    this.cfg.onCall?.(method, params);
-  }
-  destroy() {
-    this.log("destroy");
-  }
-};
-function createMockBridge(config) {
-  return new MockAppBridge(config);
-}
 export {
-  AppBridge,
-  BridgeError,
-  BridgeProvider,
-  MockAppBridge,
-  createAppBridge,
-  createMockBridge
+  BevoApiClient,
+  BevoMiniApp
 };
-//# sourceMappingURL=index.js.map

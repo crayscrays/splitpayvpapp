@@ -1,10 +1,32 @@
-import { createAppBridge, type AppBridge } from "@bevo/app-sdk";
-import type { UserProfile, GroupSummary, GroupMember, Contact, AppCard } from "@bevo/app-sdk";
+import { BevoMiniApp } from "@bevo/app-sdk";
+import type { UserProfile } from "@bevo/app-sdk";
 
-// USDC on Base Sepolia
+// USDC on Base
 export const USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
-// ---------- Social mock fallbacks (contacts only — no pre-populated groups) ----------
+// ---------- Local types (formerly from @0xchat/app-sdk) ----------
+
+export interface GroupMember {
+  walletAddress: string;
+  displayName: string;
+  avatar: string;
+  roles: string[];
+}
+
+export interface GroupSummary {
+  id: string;
+  name: string;
+  avatar: string;
+  memberCount: number;
+}
+
+export interface Contact {
+  walletAddress: string;
+  displayName: string;
+  avatar: string;
+}
+
+// ---------- Social mock fallbacks ----------
 
 export const MOCK_CONTACTS: Contact[] = [
   { walletAddress: "0xAA1c3F9a2bD4e00112233445566778899aABBccD", displayName: "Alice", avatar: "" },
@@ -15,24 +37,17 @@ export const MOCK_CONTACTS: Contact[] = [
 
 // ---------- Bridge client ----------
 
-const TOKEN_ADDRESSES: Record<string, string> = {
-  USDC: USDC_BASE_SEPOLIA,
-};
-
 class BridgeClient {
-  private sdkBridge: AppBridge | null = null;
-  private txBridge: AppBridge | null = null;
+  private bevo: BevoMiniApp | null = null;
 
   constructor() {
     if (typeof window !== "undefined") {
       try {
-        // Short timeout for profile/balance calls — fails fast when not in 0xChat
-        this.sdkBridge = createAppBridge({ appId: "splitpay", timeout: 2500 });
-        // Long timeout for transactions — user needs time to approve the signing prompt
-        this.txBridge = createAppBridge({ appId: "splitpay", timeout: 60000 });
+        this.bevo = BevoMiniApp.isInsideBevo
+          ? BevoMiniApp.init()
+          : BevoMiniApp.mock();
       } catch {
-        this.sdkBridge = null;
-        this.txBridge = null;
+        this.bevo = null;
       }
     }
   }
@@ -40,9 +55,11 @@ class BridgeClient {
   // ---- Profile ----
 
   async getProfileOrNull(): Promise<UserProfile | null> {
-    if (!this.sdkBridge) return null;
+    if (!this.bevo) return null;
     try {
-      return await this.sdkBridge.user.getProfile();
+      const profile = this.bevo.user;
+      if (!profile.walletAddress) return null;
+      return profile;
     } catch {
       return null;
     }
@@ -50,68 +67,81 @@ class BridgeClient {
 
   // ---- Wallet ----
 
-  async getBalance(token = "USDC"): Promise<string> {
-    if (!this.sdkBridge) return "0.00";
+  async getBalance(_token = "USDC"): Promise<string> {
+    if (!this.bevo) return "0.00";
     try {
-      return await this.sdkBridge.wallet.getBalance({ token });
+      const balances = await this.bevo.waitForBalances(5000);
+      const val = balances.usdc;
+      return val != null ? val.toFixed(2) : "0.00";
     } catch {
       return "0.00";
     }
   }
 
   async sendTransaction(params: { to: string; token: string; amount: string }): Promise<string> {
-    const bridge = this.txBridge ?? this.sdkBridge;
-    if (!bridge) throw new Error("Not connected to 0xChat.");
-    // Resolve token symbol to contract address if needed
-    const token = TOKEN_ADDRESSES[params.token] ?? params.token;
-    return bridge.wallet.sendTransaction({ ...params, token });
+    if (!this.bevo) throw new Error("Not connected to Bevo.");
+    const result = await this.bevo.api.transferTokens({
+      toUserWallet: params.to,
+      amountEth: parseFloat(params.amount),
+      token: params.token as "ETH" | "USDC" | "USDT",
+    });
+    return result.txHash;
   }
 
-  // ---- Social (falls back gracefully when not in 0xChat) ----
+  // ---- Social ----
 
-  private async call<T>(fn: () => Promise<T>, fallback: T | (() => T | Promise<T>)): Promise<T> {
-    if (!this.sdkBridge) {
-      return typeof fallback === "function" ? (fallback as any)() : fallback;
-    }
+  async listGroups(): Promise<GroupSummary[]> {
+    if (!this.bevo) return [];
     try {
-      return await fn();
+      const groups = await this.bevo.api.getMyGroups();
+      return groups.map((g) => ({
+        id: String(g.id),
+        name: g.name,
+        avatar: g.avatar,
+        memberCount: g.memberCount,
+      }));
     } catch {
-      return typeof fallback === "function" ? (fallback as any)() : fallback;
+      return [];
     }
   }
 
-  listGroups = (): Promise<GroupSummary[]> =>
-    this.call(() => this.sdkBridge!.groups.list(), []);
+  async getGroupMembers(_groupId: string): Promise<GroupMember[]> {
+    // No group-members endpoint in the Bevo SDK; members are managed via Supabase
+    return [];
+  }
 
-  getGroupMembers = (groupId: string): Promise<GroupMember[]> =>
-    this.call(() => this.sdkBridge!.groups.getMembers(groupId), []);
-
-  listContacts = (): Promise<Contact[]> =>
-    this.call(() => this.sdkBridge!.contacts.list(), MOCK_CONTACTS);
+  async listContacts(): Promise<Contact[]> {
+    if (!this.bevo) return MOCK_CONTACTS;
+    try {
+      const users = await this.bevo.api.searchUsers("");
+      if (!users.length) return MOCK_CONTACTS;
+      return users.map((u) => ({
+        walletAddress: u.walletAddress,
+        displayName: u.displayName,
+        avatar: u.avatar,
+      }));
+    } catch {
+      return MOCK_CONTACTS;
+    }
+  }
 
   async resolveContact(walletAddress: string): Promise<Contact | null> {
-    if (!this.sdkBridge) return null;
+    if (!this.bevo) return null;
     try {
-      const contacts = await this.sdkBridge.contacts.list();
-      return contacts.find((c) => c.walletAddress.toLowerCase() === walletAddress.toLowerCase()) ?? null;
+      const users = await this.bevo.api.searchUsers(walletAddress);
+      const match = users.find(
+        (u) => u.walletAddress.toLowerCase() === walletAddress.toLowerCase()
+      );
+      if (!match) return null;
+      return { walletAddress: match.walletAddress, displayName: match.displayName, avatar: match.avatar };
     } catch {
       return null;
     }
   }
 
-  shareCardToGroup = (params: { groupId: string; channelId?: string; card: AppCard }): Promise<void> =>
-    this.call(
-      () => this.sdkBridge!.chat.shareCardToGroup({
-        groupId: params.groupId,
-        channelId: params.channelId ?? params.groupId,
-        card: params.card,
-      }),
-      undefined as unknown as void
-    );
-
-  openGroup = (groupId: string): void => {
-    try { this.sdkBridge?.navigation.openGroup(groupId); } catch {}
-  };
+  // shareCardToGroup and openGroup are not available in the Bevo SDK
+  async shareCardToGroup(_params: unknown): Promise<void> {}
+  openGroup(_groupId: string): void {}
 }
 
 export const bridge = new BridgeClient();
