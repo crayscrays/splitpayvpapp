@@ -81,7 +81,7 @@ export function SettleUp() {
         [key]: {
           status: "error",
           error: isNoGas
-            ? "Your wallet has no ETH for gas. Fund it with Base Sepolia ETH from a faucet, then retry."
+            ? "Your wallet has no ETH for gas. Fund it with Base ETH, then retry."
             : err?.shortMessage ?? err?.message ?? "Transaction failed",
         },
       }));
@@ -156,7 +156,7 @@ export function SettleUp() {
                             <div className="text-sm font-medium truncate">
                               To {to?.displayName ?? "Unknown"}
                             </div>
-                            <div className="text-xs text-text-muted">USDC on Base Sepolia</div>
+                            <div className="text-xs text-text-muted">USDC on Base</div>
                           </div>
                           <div className="text-right">
                             <div className="font-semibold">

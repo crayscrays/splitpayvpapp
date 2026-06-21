@@ -1,8 +1,8 @@
 import { BevoMiniApp } from "@bevo/app-sdk";
 import type { UserProfile } from "@bevo/app-sdk";
 
-// USDC on Base
-export const USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+// USDC on Base Mainnet
+export const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 // ---------- Local types (formerly from @0xchat/app-sdk) ----------
 

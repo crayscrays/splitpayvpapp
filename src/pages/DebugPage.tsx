@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BevoMiniApp } from "@bevo/app-sdk";
-import { USDC_BASE_SEPOLIA } from "@/lib/bridge";
+import { USDC_BASE } from "@/lib/bridge";
 
 interface Step {
   label: string;
@@ -77,7 +77,7 @@ export function DebugPage() {
         SDK: <code className="font-mono">@bevo/app-sdk</code> · BevoMiniApp
       </p>
       <p className="text-xs text-text-dim font-mono break-all">
-        USDC: {USDC_BASE_SEPOLIA}
+        USDC: {USDC_BASE}
       </p>
 
       {steps.map((step, i) => (
