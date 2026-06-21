@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowRightLeft, Check, Copy, ExternalLink, Plus, Receipt, Share2, UserPlus, Users, X } from "lucide-react";
+import { ArrowRightLeft, Check, Copy, Plus, Receipt, Share2, UserPlus, Users, X } from "lucide-react";
 import { useSplitPay } from "@/lib/splitpay-context";
 import { Header } from "@/components/Header";
 import { MemberAvatar } from "@/components/MemberAvatar";
@@ -40,16 +40,16 @@ export function GroupDetail() {
   const myNet = balances[myWallet] ?? 0;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 relative">
+    <div className="flex-1 flex flex-col min-h-0 relative bg-bg">
       <Header
         title={group.name}
         subtitle={`${group.members.length} member${group.members.length === 1 ? "" : "s"}`}
         back="/"
       />
 
-      {/* Summary header */}
-      <section className="px-4 pt-4 pb-3">
-        <div className="flex items-center gap-2 mb-4">
+      {/* Group summary bar */}
+      <div className="bg-surface border-b border-border px-4 pt-4 pb-4">
+        <div className="flex items-center gap-2 mb-3">
           <div className="flex -space-x-2 flex-1">
             {group.members.slice(0, 6).map((m) => (
               <MemberAvatar
@@ -66,7 +66,6 @@ export function GroupDetail() {
               </span>
             )}
           </div>
-          {/* Invite button */}
           <button
             onClick={() => setShowInvite(true)}
             className="btn btn-secondary px-3 py-1.5 text-xs flex-shrink-0"
@@ -76,49 +75,51 @@ export function GroupDetail() {
           </button>
         </div>
 
-        <div className="card p-4">
-          <div className="text-xs text-text-muted">Your balance in this group</div>
-          <div
-            className={cn(
-              "mt-1 text-2xl font-semibold tracking-tight",
-              Math.abs(myNet) < 0.01
-                ? "text-text-muted"
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs text-text-muted">your balance</div>
+            <div
+              className={cn(
+                "mt-0.5 text-2xl font-bold tracking-tight",
+                Math.abs(myNet) < 0.01
+                  ? "text-text-muted"
+                  : myNet > 0
+                  ? "text-positive"
+                  : "text-negative"
+              )}
+              data-testid="text-my-balance"
+            >
+              {Math.abs(myNet) < 0.01
+                ? "settled up"
                 : myNet > 0
-                ? "text-positive"
-                : "text-negative"
-            )}
-            data-testid="text-my-balance"
-          >
-            {Math.abs(myNet) < 0.01
-              ? "All settled"
-              : myNet > 0
-              ? `+${formatCurrency(myNet)}`
-              : `-${formatCurrency(-myNet)}`}
+                ? `+${formatCurrency(myNet)}`
+                : `-${formatCurrency(-myNet)}`}
+            </div>
           </div>
           {Math.abs(myNet) > 0.01 && (
             <button
               onClick={() => nav(`/group/${group.id}/settle`)}
-              className="btn btn-secondary mt-3 px-3 py-2 text-sm w-full"
+              className="btn btn-primary px-4 py-2 text-sm"
               data-testid="button-settle-up"
             >
               <ArrowRightLeft size={14} /> Settle up
             </button>
           )}
         </div>
-      </section>
+      </div>
 
-      {/* Tabs */}
-      <div className="px-4">
-        <div className="flex gap-1 p-1 bg-surface-2 rounded-lg border border-border">
+      {/* Underline tabs */}
+      <div className="bg-surface border-b border-border">
+        <div className="flex">
           {(["expenses", "balances", "activity"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={cn(
-                "flex-1 px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors",
+                "flex-1 py-3 text-sm font-medium capitalize transition-colors border-b-2 -mb-px",
                 tab === t
-                  ? "bg-surface text-text shadow-soft"
-                  : "text-text-muted hover:text-text"
+                  ? "border-accent text-accent"
+                  : "border-transparent text-text-muted hover:text-text"
               )}
               data-testid={`tab-${t}`}
             >
@@ -129,14 +130,22 @@ export function GroupDetail() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-20 min-h-0">
+      <div className="flex-1 overflow-y-auto pb-20 min-h-0">
         {tab === "expenses" && (
-          <ExpensesTab group={group} myWallet={myWallet} />
+          <div className="mt-3 bg-surface">
+            <ExpensesTab group={group} myWallet={myWallet} />
+          </div>
         )}
         {tab === "balances" && (
-          <BalancesTab group={group} myWallet={myWallet} balances={balances} />
+          <div className="mt-3 bg-surface">
+            <BalancesTab group={group} myWallet={myWallet} balances={balances} />
+          </div>
         )}
-        {tab === "activity" && <ActivityTab group={group} />}
+        {tab === "activity" && (
+          <div className="mt-3 bg-surface">
+            <ActivityTab group={group} />
+          </div>
+        )}
       </div>
 
       {/* FAB */}
@@ -149,7 +158,6 @@ export function GroupDetail() {
         <Plus size={22} />
       </Link>
 
-      {/* Invite sheet */}
       {showInvite && (
         <InviteSheet groupId={group.id} groupName={group.name} onClose={() => setShowInvite(false)} />
       )}
@@ -199,7 +207,7 @@ function InviteSheet({
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center">
       <button
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close"
       />
@@ -211,7 +219,6 @@ function InviteSheet({
           </button>
         </div>
         <div className="p-4 space-y-4">
-          {/* Invite code — for verbal / manual sharing */}
           <div className="flex flex-col items-center gap-1 py-3 rounded-xl bg-accent/5 border border-accent/20">
             <div className="text-xs text-text-muted">Invite code</div>
             <div className="text-3xl font-bold tracking-[0.25em] font-mono text-accent">
@@ -220,7 +227,6 @@ function InviteSheet({
             <div className="text-xs text-text-dim">Others can enter this code to join</div>
           </div>
 
-          {/* Full link row */}
           <div className="space-y-1.5">
             <div className="text-xs text-text-muted">Or share the invite link</div>
             <div className="flex gap-2 items-center">
@@ -241,7 +247,6 @@ function InviteSheet({
             </div>
           </div>
 
-          {/* Share to 0xChat */}
           <button
             onClick={shareToChat}
             className="btn btn-secondary w-full py-2.5 text-sm"
@@ -264,19 +269,17 @@ function ExpensesTab({
 }) {
   if (group.expenses.length === 0) {
     return (
-      <div className="card p-8 text-center fade-in">
-        <div className="inline-flex h-12 w-12 rounded-full bg-surface-2 items-center justify-center mb-3">
-          <Receipt size={20} className="text-text-muted" />
+      <div className="px-4 py-10 text-center fade-in">
+        <div className="inline-flex h-12 w-12 rounded-2xl bg-orange-100 items-center justify-center mb-3">
+          <Receipt size={22} className="text-orange-400" />
         </div>
         <div className="text-sm font-medium text-text">No expenses yet</div>
-        <div className="text-xs text-text-muted mt-1">
-          Tap + to add the first expense
-        </div>
+        <div className="text-xs text-text-muted mt-1">Tap + to add the first expense</div>
       </div>
     );
   }
   return (
-    <div className="space-y-2 fade-in">
+    <div className="divide-y divide-border fade-in">
       {group.expenses.map((e) => (
         <ExpenseCard key={e.id} expense={e} group={group} myWallet={myWallet} />
       ))}
@@ -299,33 +302,37 @@ function BalancesTab({
   );
 
   return (
-    <div className="space-y-2 fade-in">
+    <div className="fade-in">
       {anyOwing && (
-        <button
-          onClick={() => nav(`/group/${group.id}/settle`)}
-          className="btn btn-primary w-full py-2.5 text-sm"
-          data-testid="button-settle-all"
-        >
-          <ArrowRightLeft size={14} /> Settle all my debts
-        </button>
+        <div className="px-4 py-3 border-b border-border">
+          <button
+            onClick={() => nav(`/group/${group.id}/settle`)}
+            className="btn btn-primary w-full py-2.5 text-sm"
+            data-testid="button-settle-all"
+          >
+            <ArrowRightLeft size={14} /> Settle all my debts
+          </button>
+        </div>
       )}
-      {group.members.map((m) => {
-        const net = balances[m.walletAddress] ?? 0;
-        const canSettle =
-          m.walletAddress !== myWallet &&
-          (balances[myWallet] ?? 0) < -0.01 &&
-          net > 0.01;
-        return (
-          <BalanceCard
-            key={m.walletAddress}
-            member={m}
-            netAmount={net}
-            myWallet={myWallet}
-            canSettle={canSettle}
-            onSettle={() => nav(`/group/${group.id}/settle`)}
-          />
-        );
-      })}
+      <div className="divide-y divide-border">
+        {group.members.map((m) => {
+          const net = balances[m.walletAddress] ?? 0;
+          const canSettle =
+            m.walletAddress !== myWallet &&
+            (balances[myWallet] ?? 0) < -0.01 &&
+            net > 0.01;
+          return (
+            <BalanceCard
+              key={m.walletAddress}
+              member={m}
+              netAmount={net}
+              myWallet={myWallet}
+              canSettle={canSettle}
+              onSettle={() => nav(`/group/${group.id}/settle`)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -337,36 +344,32 @@ function ActivityTab({
 }) {
   if (group.activity.length === 0) {
     return (
-      <div className="card p-8 text-center fade-in">
-        <div className="inline-flex h-12 w-12 rounded-full bg-surface-2 items-center justify-center mb-3">
-          <Users size={20} className="text-text-muted" />
+      <div className="px-4 py-10 text-center fade-in">
+        <div className="inline-flex h-12 w-12 rounded-2xl bg-surface-2 items-center justify-center mb-3">
+          <Users size={22} className="text-text-dim" />
         </div>
         <div className="text-sm font-medium text-text">No activity yet</div>
       </div>
     );
   }
   return (
-    <div className="space-y-2 fade-in">
+    <div className="divide-y divide-border fade-in">
       {group.activity.map((a) => {
         const actor = group.members.find((m) => m.walletAddress === a.actor);
-        const Icon =
-          a.type === "payment_settled"
-            ? ArrowRightLeft
-            : a.type === "group_joined"
-            ? UserPlus
-            : Receipt;
         return (
           <div
             key={a.id}
-            className="flex items-start gap-3 p-3 rounded-lg hover:bg-surface-2 transition-colors"
+            className="flex items-start gap-3 px-4 py-3 hover:bg-surface-2 transition-colors"
             data-testid={`activity-${a.id}`}
           >
-            <div className="h-8 w-8 rounded-full bg-surface-2 border border-border flex items-center justify-center flex-shrink-0">
-              <Icon size={14} className="text-text-muted" />
-            </div>
+            <MemberAvatar
+              name={actor?.displayName ?? "?"}
+              wallet={a.actor}
+              size="sm"
+            />
             <div className="min-w-0 flex-1">
               <div className="text-sm text-text">
-                <span className="font-medium">
+                <span className="font-semibold">
                   {actor ? actor.displayName : "Someone"}
                 </span>{" "}
                 <span className="text-text-muted">{a.message}</span>

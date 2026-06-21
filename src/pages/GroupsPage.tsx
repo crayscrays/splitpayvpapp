@@ -21,11 +21,7 @@ function JoinByCodeSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center">
-      <button
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-label="Close"
-      />
+      <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-label="Close" />
       <div className="relative w-full max-w-[480px] bg-surface border-t border-border rounded-t-2xl fade-in">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h3 className="font-semibold">Join by code</h3>
@@ -78,15 +74,25 @@ export function GroupsPage() {
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0 bg-bg">
       <Header
         title="Groups"
         subtitle={`${sp.groups.length} group${sp.groups.length === 1 ? "" : "s"}`}
+        right={
+          <button
+            onClick={() => setShowSheet(true)}
+            className="h-8 w-8 rounded-full bg-accent flex items-center justify-center"
+            aria-label="Add group"
+            data-testid="button-add-group-page"
+          >
+            <Plus size={16} className="text-white" />
+          </button>
+        }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-        {sp.groups.length > 0 && (
-          <section className="space-y-3">
+      <div className="flex-1 overflow-y-auto">
+        {groupsWithBal.length > 0 && (
+          <div className="mt-3 bg-surface divide-y divide-border">
             {groupsWithBal.map(({ group, netBalance }) => (
               <GroupCard
                 key={group.id}
@@ -95,12 +101,12 @@ export function GroupsPage() {
                 netBalance={netBalance}
               />
             ))}
-          </section>
+          </div>
         )}
 
         {sp.groups.length === 0 && (
-          <div className="card p-8 text-center text-sm text-text-muted">
-            <div className="mb-4">No groups yet.</div>
+          <div className="mt-3 bg-surface px-4 py-10 text-center">
+            <div className="text-sm text-text-muted mb-4">No groups yet.</div>
             <button
               onClick={() => setShowSheet(true)}
               className="btn btn-primary px-4 py-2 text-sm"
@@ -110,33 +116,35 @@ export function GroupsPage() {
           </div>
         )}
 
-        <button
-          onClick={() => setShowSheet(true)}
-          className="w-full card p-3 flex items-center gap-3 hover:border-border-strong text-left border border-dashed"
-          data-testid="button-add-group-page"
-        >
-          <div className="h-9 w-9 rounded-full bg-surface-2 border border-border flex items-center justify-center flex-shrink-0">
-            <Plus size={16} className="text-text-muted" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-medium text-text-muted">Add group</div>
-            <div className="text-xs text-text-dim">Create new or link from 0xChat</div>
-          </div>
-        </button>
+        <div className="mt-3 bg-surface divide-y divide-border">
+          <button
+            onClick={() => setShowSheet(true)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2 transition-colors text-left"
+            data-testid="button-add-group-row"
+          >
+            <div className="h-11 w-11 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
+              <Plus size={18} className="text-accent" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-accent text-[15px]">Add group</div>
+              <div className="text-xs text-text-muted">Create new or link from 0xChat</div>
+            </div>
+          </button>
 
-        <button
-          onClick={() => setShowJoinCode(true)}
-          className="w-full card p-3 flex items-center gap-3 hover:border-border-strong text-left border border-dashed"
-          data-testid="button-join-by-code"
-        >
-          <div className="h-9 w-9 rounded-full bg-surface-2 border border-border flex items-center justify-center flex-shrink-0">
-            <Hash size={16} className="text-text-muted" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-medium text-text-muted">Join by code</div>
-            <div className="text-xs text-text-dim">Enter a 6-letter invite code</div>
-          </div>
-        </button>
+          <button
+            onClick={() => setShowJoinCode(true)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2 transition-colors text-left"
+            data-testid="button-join-by-code"
+          >
+            <div className="h-11 w-11 rounded-xl bg-surface-2 border border-border flex items-center justify-center flex-shrink-0">
+              <Hash size={18} className="text-text-muted" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-text text-[15px]">Join by code</div>
+              <div className="text-xs text-text-muted">Enter a 6-letter invite code</div>
+            </div>
+          </button>
+        </div>
       </div>
 
       {showSheet && <GroupSheet onClose={() => setShowSheet(false)} />}
