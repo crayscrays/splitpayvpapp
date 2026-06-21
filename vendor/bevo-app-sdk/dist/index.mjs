@@ -1,38 +1,9 @@
-"use strict";
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-
-// src/index.ts
-var index_exports = {};
-__export(index_exports, {
-  BevoApiClient: () => BevoApiClient,
-  BevoMiniApp: () => BevoMiniApp
-});
-module.exports = __toCommonJS(index_exports);
-
 // src/app.ts
 var BevoApiClient = class {
   constructor(context) {
-    __publicField(this, "context");
     this.context = context;
   }
+  /** @internal Update context when the host app re-injects with fresh data. */
   _update(context) {
     this.context = context;
   }
@@ -45,6 +16,7 @@ var BevoApiClient = class {
   get base() {
     return this.context.apiBase.replace(/\/+$/, "");
   }
+  /** Make an authenticated request to the Bevo backend. */
   async request(path, init = {}) {
     const res = await fetch(`${this.base}${path}`, {
       ...init,
@@ -57,24 +29,35 @@ var BevoApiClient = class {
     const text = await res.text();
     return text ? JSON.parse(text) : {};
   }
+  // ── Profile ───────────────────────────────────────────────────────────────
+  /** Fetch the signed-in user's full backend profile. */
   getMyProfile() {
     return this.request("/api/users/me");
   }
+  /** Fetch any user's public profile by principalId. */
+  getUser(principalId) {
+    return this.request(`/api/users/${encodeURIComponent(principalId)}`);
+  }
+  /** Update the signed-in user's profile. */
   updateProfile(data) {
     return this.request("/api/users/profile", {
       method: "PATCH",
       body: JSON.stringify(data)
     });
   }
+  /** Search users by display name, username, email, or wallet. */
   searchUsers(query) {
     return this.request(`/api/users/search?q=${encodeURIComponent(query)}`);
   }
+  // ── DMs ───────────────────────────────────────────────────────────────────
+  /** List the user's DM conversations. */
   async getConversations() {
     const data = await this.request(
       "/api/chat/conversations"
     );
     return Array.isArray(data) ? data : data.items ?? [];
   }
+  /** Create or get an existing conversation with a peer. Returns the conversation id. */
   async createOrGetConversation(peerPrincipalId) {
     const data = await this.request("/api/chat/conversations", {
       method: "POST",
@@ -82,6 +65,7 @@ var BevoApiClient = class {
     });
     return data.id;
   }
+  /** Fetch messages for a conversation (newest last). */
   async getMessages(conversationId, after) {
     const params = after ? `?after=${encodeURIComponent(after)}` : "";
     const data = await this.request(
@@ -89,17 +73,21 @@ var BevoApiClient = class {
     );
     return Array.isArray(data) ? data : data.items ?? [];
   }
+  /** Send a DM. Returns the created message. */
   sendMessage(conversationId, content) {
     return this.request(`/api/chat/conversations/${conversationId}/messages`, {
       method: "POST",
       body: JSON.stringify({ content })
     });
   }
+  /** Mark a conversation as read. */
   markRead(conversationId) {
     return this.request(`/api/chat/conversations/${conversationId}/read`, {
       method: "POST"
     });
   }
+  // ── Groups ────────────────────────────────────────────────────────────────
+  /** List groups the user belongs to. */
   async getMyGroups() {
     const principalId = this.context.principalId;
     const data = await this.request(
@@ -107,12 +95,36 @@ var BevoApiClient = class {
     );
     return Array.isArray(data) ? data : data.items ?? [];
   }
+  /** Fetch a single group by its numeric ID. */
+  getGroup(groupId) {
+    return this.request(`/api/groups/${groupId}`);
+  }
+  /** Search public groups. */
   async searchGroups(query) {
     const data = await this.request(
       `/api/groups/search?q=${encodeURIComponent(query)}`
     );
     return Array.isArray(data) ? data : data.items ?? [];
   }
+  /** Fetch messages from a group channel (newest last, max 100). */
+  async getGroupMessages(groupId, channelId, opts = {}) {
+    const qs = new URLSearchParams();
+    if (opts.limit) qs.set("limit", String(opts.limit));
+    if (opts.before) qs.set("before", opts.before);
+    const data = await this.request(
+      `/api/groups/${groupId}/channels/${channelId}/messages${qs.size ? `?${qs}` : ""}`
+    );
+    return Array.isArray(data) ? data : data.items ?? [];
+  }
+  /** Send a message to a group channel. Returns the created message. */
+  sendGroupMessage(groupId, channelId, content) {
+    return this.request(`/api/groups/${groupId}/channels/${channelId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content })
+    });
+  }
+  // ── Apps ──────────────────────────────────────────────────────────────────
+  /** List active apps in the Bevo app store. */
   async getApps(params) {
     const qs = new URLSearchParams();
     if (params?.search) qs.set("search", params.search);
@@ -122,9 +134,43 @@ var BevoApiClient = class {
     );
     return data.items;
   }
+  /** Get this mini-app's own manifest (by slug). */
   getApp(slug) {
     return this.request(`/api/apps/${slug}`);
   }
+  /** List apps installed by the current user. */
+  async getInstalledApps() {
+    const data = await this.request("/api/apps/installed");
+    return data.items;
+  }
+  /** Install an app for the current user, granting the specified permissions. */
+  installApp(slug, grantedPermissions = []) {
+    return this.request(`/api/apps/${slug}/install`, {
+      method: "POST",
+      body: JSON.stringify({ grantedPermissions })
+    });
+  }
+  /** Uninstall an app for the current user. */
+  uninstallApp(slug) {
+    return this.request(`/api/apps/${slug}/install`, { method: "DELETE" });
+  }
+  // ── Contacts ─────────────────────────────────────────────────────────────
+  /** List the current user's contact relationships. */
+  async getContacts() {
+    const data = await this.request("/api/contacts");
+    return data.contacts;
+  }
+  // ── Permissions ───────────────────────────────────────────────────────────
+  /** List active permission grants the current user has given to bot agents. */
+  async getMyPermissions() {
+    const data = await this.request("/api/agent-permissions/my");
+    return data.items;
+  }
+  // ── Wallet ────────────────────────────────────────────────────────────────
+  /**
+   * Request a token transfer from the user's agent wallet.
+   * Requires the `wallet.send` permission to have been granted at install.
+   */
   transferTokens(params) {
     return this.request("/api/wallet/transfer", {
       method: "POST",
@@ -134,8 +180,6 @@ var BevoApiClient = class {
 };
 var BevoMiniApp = class _BevoMiniApp {
   constructor(context) {
-    __publicField(this, "_context");
-    __publicField(this, "api");
     this._context = context;
     this.api = new BevoApiClient(context);
     window.addEventListener("bevo:context-updated", (e) => {
@@ -143,6 +187,13 @@ var BevoMiniApp = class _BevoMiniApp {
       this.api._update(e.detail);
     });
   }
+  /**
+   * Initialize the SDK from `window.BevoContext`.
+   * Call this once at app startup, after the DOM is ready.
+   *
+   * Throws if `window.BevoContext` is not yet available (i.e. the page is not
+   * running inside the Bevo host app).
+   */
   static init() {
     if (typeof window === "undefined" || !window.BevoContext) {
       throw new Error(
@@ -151,6 +202,10 @@ var BevoMiniApp = class _BevoMiniApp {
     }
     return new _BevoMiniApp(window.BevoContext);
   }
+  /**
+   * Initialize in dev mode with mock context — use this during local
+   * development outside the Bevo host app.
+   */
   static mock(overrides = {}) {
     const mock = {
       authToken: "dev-token",
@@ -170,9 +225,11 @@ var BevoMiniApp = class _BevoMiniApp {
     }
     return new _BevoMiniApp(mock);
   }
+  /** Raw BevoContext as injected by the host app. */
   get context() {
     return this._context;
   }
+  /** The signed-in user's profile. */
   get user() {
     return {
       principalId: this._context.principalId,
@@ -182,9 +239,14 @@ var BevoMiniApp = class _BevoMiniApp {
       avatar: this._context.avatar
     };
   }
+  /** Current wallet balances (ETH/USDC/USDT). Null until fetched from chain. */
   get balances() {
     return this._context.balances;
   }
+  /**
+   * The user's hosted agent wallet info.
+   * Null until the host app finishes the background fetch (~1-2 s after load).
+   */
   get agent() {
     if (!this._context.agentWalletAddress || !this._context.agentPrincipalId) return null;
     return {
@@ -192,14 +254,29 @@ var BevoMiniApp = class _BevoMiniApp {
       principalId: this._context.agentPrincipalId
     };
   }
+  /** True when the SDK is running inside the Bevo host app. */
   static get isInsideBevo() {
     return typeof window !== "undefined" && !!window.BevoContext;
   }
+  /**
+   * Subscribe to context updates (balances + agent wallet arriving async).
+   * Returns an unsubscribe function.
+   *
+   * @example
+   * const unsub = bevo.onUpdate((ctx) => {
+   *   updateUI(ctx.balances);
+   * });
+   * // later: unsub();
+   */
   onUpdate(callback) {
     const handler = (e) => callback(e.detail);
     window.addEventListener("bevo:context-updated", handler);
     return () => window.removeEventListener("bevo:context-updated", handler);
   }
+  /**
+   * Wait for balances to be available. Resolves as soon as non-null balances
+   * arrive (or immediately if they're already loaded). Rejects after `timeoutMs`.
+   */
   waitForBalances(timeoutMs = 1e4) {
     if (this._context.balances.eth !== null) {
       return Promise.resolve(this._context.balances);
@@ -218,6 +295,10 @@ var BevoMiniApp = class _BevoMiniApp {
       });
     });
   }
+  /**
+   * Wait for the agent wallet to be available. Resolves as soon as the host
+   * app finishes its background fetch. Rejects after `timeoutMs`.
+   */
   waitForAgent(timeoutMs = 1e4) {
     if (this.agent) return Promise.resolve(this.agent);
     return new Promise((resolve, reject) => {
@@ -236,8 +317,7 @@ var BevoMiniApp = class _BevoMiniApp {
     });
   }
 };
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
+export {
   BevoApiClient,
   BevoMiniApp
-});
+};
