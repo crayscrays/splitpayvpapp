@@ -80,12 +80,23 @@ class BridgeClient {
 
   async sendTransaction(params: { to: string; token: string; amount: string }): Promise<string> {
     if (!this.bevo) throw new Error("Not connected to Bevo.");
-    const result = await this.bevo.api.transferTokens({
-      toUserWallet: params.to,
-      amountEth: parseFloat(params.amount),
-      token: params.token as "ETH" | "USDC" | "USDT",
-    });
-    return result.txHash;
+    try {
+      const result = await this.bevo.api.transferTokens({
+        toUserWallet: params.to,
+        amountEth: parseFloat(params.amount),
+        token: params.token as "ETH" | "USDC" | "USDT",
+        fromWallet: "personal",
+      });
+      return result.txHash;
+    } catch (err: any) {
+      console.error("[bridge] transferTokens failed:", {
+        message: err?.message,
+        status: err?.status,
+        cause: err?.cause,
+        raw: err,
+      });
+      throw err;
+    }
   }
 
   // ---- Social ----

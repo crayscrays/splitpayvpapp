@@ -76,12 +76,19 @@ export function SettleUp() {
         raw.includes("gas required exceeds allowance") ||
         raw.includes("insufficient funds") ||
         raw.includes("exceeds allowance (0)");
+      const isNetworkError =
+        raw.includes("load failed") ||
+        raw.includes("failed to fetch") ||
+        raw.includes("networkerror") ||
+        raw.includes("network request failed");
       setPayments((p) => ({
         ...p,
         [key]: {
           status: "error",
           error: isNoGas
             ? "Your wallet has no ETH for gas. Fund it with Base ETH, then retry."
+            : isNetworkError
+            ? "Could not reach the Bevo wallet API. Check your connection and try again."
             : err?.shortMessage ?? err?.message ?? "Transaction failed",
         },
       }));
