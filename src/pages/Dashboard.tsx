@@ -3,7 +3,8 @@ import { Plus, RefreshCw, Users } from "lucide-react";
 import { useSplitPay } from "@/lib/splitpay-context";
 import { GroupCard } from "@/components/GroupCard";
 import { GroupSheet } from "@/components/GroupSheet";
-import { computeNetBalances, formatCurrency } from "@/lib/utils";
+import { MemberAvatar } from "@/components/MemberAvatar";
+import { computeNetBalances, formatCurrency, formatAddress } from "@/lib/utils";
 
 export function Dashboard() {
   const sp = useSplitPay();
@@ -32,9 +33,22 @@ export function Dashboard() {
       {/* Balance summary */}
       <div className="bg-surface border-b border-border px-4 pt-5 pb-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-text" data-testid="text-profile-name">
-            {sp.profile?.displayName ?? "Hi there"}
-          </h2>
+          <div className="flex items-center gap-3">
+            <MemberAvatar
+              name={sp.profile?.displayName ?? "Me"}
+              wallet={myWallet}
+              src={sp.profile?.avatar}
+              size="md"
+            />
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-text leading-tight" data-testid="text-profile-name">
+                {sp.profile?.displayName ?? "Hi there"}
+              </h2>
+              {myWallet && (
+                <p className="text-xs text-text-muted font-mono truncate">{formatAddress(myWallet, 6)}</p>
+              )}
+            </div>
+          </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}

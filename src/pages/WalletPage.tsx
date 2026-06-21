@@ -29,6 +29,7 @@ export function WalletPage() {
             <MemberAvatar
               name={sp.profile?.displayName ?? "You"}
               wallet={addr}
+              src={sp.profile?.avatar}
               size="lg"
             />
             <div className="min-w-0">
