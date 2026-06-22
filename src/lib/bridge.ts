@@ -52,6 +52,10 @@ class BridgeClient {
     }
   }
 
+  get apiBase(): string {
+    return this.bevo?.context?.apiBase ?? "(no context)";
+  }
+
   // ---- Profile ----
 
   async getProfileOrNull(): Promise<UserProfile | null> {

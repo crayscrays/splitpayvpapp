@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowRight, Check, ExternalLink, Loader2 } from "lucide-react";
 import { useSplitPay } from "@/lib/splitpay-context";
+import { bridge } from "@/lib/bridge";
 import { Header } from "@/components/Header";
 import { MemberAvatar } from "@/components/MemberAvatar";
 import { formatCurrency } from "@/lib/utils";
@@ -10,6 +11,7 @@ interface PaymentState {
   status: "idle" | "pending" | "success" | "error";
   txHash?: string;
   error?: string;
+  debugInfo?: string;
 }
 
 export function SettleUp() {
@@ -90,6 +92,7 @@ export function SettleUp() {
             : isNetworkError
             ? "Could not reach the Bevo wallet API. Check your connection and try again."
             : err?.shortMessage ?? err?.message ?? "Transaction failed",
+          debugInfo: `API: ${bridge.apiBase} | err: ${err?.message ?? String(err)}`,
         },
       }));
     }
@@ -212,6 +215,11 @@ export function SettleUp() {
                             <div className="space-y-2">
                               <div className="text-xs text-negative bg-negative/10 border border-negative/30 rounded-lg px-3 py-2">
                                 {state.error}
+                                {state.debugInfo && (
+                                  <div className="mt-1 text-[10px] text-text-muted font-mono break-all opacity-70">
+                                    {state.debugInfo}
+                                  </div>
+                                )}
                               </div>
                               <button
                                 onClick={() => settleDebt(d)}
