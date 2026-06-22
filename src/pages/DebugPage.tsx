@@ -16,6 +16,8 @@ export function DebugPage() {
     { label: "BevoMiniApp.init() / mock()", status: "pending" },
     { label: "bevo.user (profile)", status: "pending" },
     { label: "bevo.waitForBalances()", status: "pending" },
+    { label: "GET /api/users/me (API reachability)", status: "pending" },
+    { label: "POST /api/wallet/transfer (dry-run)", status: "pending" },
   ]);
 
   const patch = (index: number, update: Partial<Step>) =>
@@ -66,6 +68,55 @@ export function DebugPage() {
         });
       } catch (e: any) {
         patch(3, { status: "error", error: e?.message ?? String(e), ms: Date.now() - t3 });
+      }
+
+      const apiBase = bevo.context.apiBase.replace(/\/+$/, "");
+
+      // Step 4: GET /api/users/me — tests basic API reachability
+      const t4 = Date.now();
+      try {
+        const res = await fetch(`${apiBase}/api/users/me`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${bevo.context.authToken}`,
+          },
+        });
+        const text = await res.text().catch(() => res.statusText);
+        if (res.ok) {
+          patch(4, { status: "ok", value: `${res.status} — apiBase: ${apiBase}`, ms: Date.now() - t4 });
+        } else {
+          patch(4, { status: "error", error: `${res.status}: ${text}\napiBase: ${apiBase}`, ms: Date.now() - t4 });
+        }
+      } catch (e: any) {
+        patch(4, { status: "error", error: `${e?.message ?? String(e)}\napiBase: ${apiBase}`, ms: Date.now() - t4 });
+      }
+
+      // Step 5: POST /api/wallet/transfer — tests wallet API reachability (amount=0, won't send)
+      const t5 = Date.now();
+      try {
+        const res = await fetch(`${apiBase}/api/wallet/transfer`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${bevo.context.authToken}`,
+          },
+          body: JSON.stringify({
+            chainId: 8453,
+            toUserWallet: bevo.user.walletAddress,
+            amountEth: 0,
+            token: "USDC",
+            fromWallet: "personal",
+          }),
+        });
+        const text = await res.text().catch(() => res.statusText);
+        if (res.ok) {
+          patch(5, { status: "ok", value: `${res.status}: ${text}`, ms: Date.now() - t5 });
+        } else {
+          // A 4xx means the server is reachable but rejected the request — that's actually useful info
+          patch(5, { status: "error", error: `HTTP ${res.status}: ${text}`, ms: Date.now() - t5 });
+        }
+      } catch (e: any) {
+        patch(5, { status: "error", error: `Network error: ${e?.message ?? String(e)}`, ms: Date.now() - t5 });
       }
     })();
   }, []);
