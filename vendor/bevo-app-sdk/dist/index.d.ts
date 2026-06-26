@@ -241,23 +241,6 @@ declare class BevoApiClient {
     getContacts(): Promise<BevoContact[]>;
     /** List active permission grants the current user has given to bot agents. */
     getMyPermissions(): Promise<BevoAgentPermission[]>;
-    /**
-     * Request a token transfer from the user's agent wallet.
-     * Requires the `wallet.send` permission to have been granted at install.
-     */
-    transferTokens(params: {
-        toUserHandle?: string;
-        toUserWallet?: string;
-        amountEth: number;
-        token?: "ETH" | "USDC" | "USDT";
-        fromWallet?: "agent" | "personal";
-    }): Promise<{
-        txHash: string;
-        fromWallet: string;
-        toWallet: string;
-        amount: number;
-        token: string;
-    }>;
 }
 /**
  * Entry point for mini-apps running inside the Bevo WebView.

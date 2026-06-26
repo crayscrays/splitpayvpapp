@@ -219,17 +219,6 @@ var BevoApiClient = class {
     const data = await this.request("/api/agent-permissions/my");
     return data.items;
   }
-  // ── Wallet ────────────────────────────────────────────────────────────────
-  /**
-   * Request a token transfer from the user's agent wallet.
-   * Requires the `wallet.send` permission to have been granted at install.
-   */
-  transferTokens(params) {
-    return this.request("/api/wallet/transfer", {
-      method: "POST",
-      body: JSON.stringify({ chainId: 8453, ...params })
-    });
-  }
 };
 var BevoMiniApp = class _BevoMiniApp {
   constructor(context) {

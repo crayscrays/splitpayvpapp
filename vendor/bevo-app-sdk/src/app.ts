@@ -269,24 +269,6 @@ export class BevoApiClient {
     return data.items;
   }
 
-  // ── Wallet ────────────────────────────────────────────────────────────────
-
-  /**
-   * Request a token transfer from the user's agent wallet.
-   * Requires the `wallet.send` permission to have been granted at install.
-   */
-  transferTokens(params: {
-    toUserHandle?: string;
-    toUserWallet?: string;
-    amountEth: number;
-    token?: "ETH" | "USDC" | "USDT";
-    fromWallet?: "agent" | "personal";
-  }): Promise<{ txHash: string; fromWallet: string; toWallet: string; amount: number; token: string }> {
-    return this.request("/api/wallet/transfer", {
-      method: "POST",
-      body: JSON.stringify({ chainId: 8453, ...params }),
-    });
-  }
 }
 
 // ── BevoMiniApp ───────────────────────────────────────────────────────────────
